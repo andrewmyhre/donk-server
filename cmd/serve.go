@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"github.com/andrewmyhre/donk-server/pkg/instance"
 	"github.com/andrewmyhre/donk-server/pkg/session"
 	"github.com/google/uuid"
@@ -49,9 +50,9 @@ var serveCmd = &cobra.Command{
 		r := mux.NewRouter()
 		r.HandleFunc("/", HomeHandler)
 		r.HandleFunc("/v1/composite", CompositeHandler)
-		r.HandleFunc("/v1/session/new/{x:[0-9]+}/{y:[0-9]+}", NewSessionHandler)
+		r.HandleFunc("/v1/session/new/{x:[0-9]+}/{y:[0-9]+}", NewSessionHandler).Methods(http.MethodPost,http.MethodOptions)
 		r.HandleFunc("/v1/session/{sessionID}/background", SessionBackgroundImageHandler)
-		r.HandleFunc("/v1/session/{sessionID}/save", SessionSaveImageHandler).Methods(http.MethodPost)
+		r.HandleFunc("/v1/session/{sessionID}/save", SessionSaveImageHandler).Methods(http.MethodPost,http.MethodOptions)
 		http.Handle("/v1", r)
 
 		srv := &http.Server{
@@ -85,6 +86,10 @@ func CompositeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func NewSessionHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method == http.MethodOptions {
+		return
+	}
 	vars := mux.Vars(r)
 	x,err := strconv.Atoi(vars["x"])
 	if err != nil {
@@ -101,6 +106,15 @@ func NewSessionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Infof("Created session %v", session.ID)
+
+	data, err := json.Marshal(session)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Error(err)
+		return
+	}
+
+	w.Write(data)
 }
 
 func SessionBackgroundImageHandler(w http.ResponseWriter, r *http.Request) {
