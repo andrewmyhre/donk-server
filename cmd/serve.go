@@ -134,7 +134,7 @@ func SessionSaveImageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = session.SaveImage(bodyData)
+	err = session.UpdateBackgroundImage(bodyData)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		log.Error(err)
