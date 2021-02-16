@@ -32,8 +32,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var defaultInstance = &instance.Instance{
+var defaultInstance = &instance.Instance {
 	ID: uuid.Nil,
+	SourceImageWidth: 5544,
+	SourceImageHeight: 3744,
+	StepCountX: 6,
+	StepCountY: 6,
+	StepSizeX: 924,
+	StepSizeY: 624,
 }
 
 // serveCmd represents the serve command
@@ -50,6 +56,8 @@ var serveCmd = &cobra.Command{
 		r := mux.NewRouter()
 		r.HandleFunc("/", HomeHandler)
 		r.HandleFunc("/v1/composite", CompositeHandler)
+		r.HandleFunc("/v1/instance/{instanceID}/composite", CompositeHandler)
+		r.HandleFunc("/v1/instance/{instanceID}", GetInstanceInfoHandler)
 		r.HandleFunc("/v1/session/new/{x:[0-9]+}/{y:[0-9]+}", NewSessionHandler).Methods(http.MethodPost,http.MethodOptions)
 		r.HandleFunc("/v1/session/{sessionID}/background", SessionBackgroundImageHandler)
 		r.HandleFunc("/v1/session/{sessionID}/save", SessionSaveImageHandler).Methods(http.MethodPost,http.MethodOptions)
@@ -73,7 +81,27 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	log.Info("home")
 }
 
+func GetInstanceInfoHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method == http.MethodOptions {
+		return
+	}
+	json, err := json.Marshal(defaultInstance)
+	if err != nil {
+		log.Error(errors.Wrap(err, "Failed to marshall instance data"))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(json)
+}
+
 func CompositeHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method == http.MethodOptions {
+		return
+	}
 	image, err := defaultInstance.GetStitchedImage()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

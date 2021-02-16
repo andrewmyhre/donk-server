@@ -15,10 +15,27 @@ import (
 
 type Instance struct {
 	ID uuid.UUID
+	CompositeImageUrl string `json:"compositeImageUrl"`
+	SourceImageWidth int64 `json:"sourceImageWidth"`
+	SourceImageHeight int64 `json:"sourceImageHeight"`
+	StepCountX int16 `json:"stepCountX"`
+	StepCountY int16 `json:"stepCountY"`
+	StepSizeX int64 `json:"stepSizeX"`
+	StepSizeY int64 `json:"stepSizeY"`
 }
 
-func New() (*Instance, error) {
-	instance := &Instance{ID: uuid.New()}
+func New(sourceImagePath string) (*Instance, error) {
+	// TODO: load source image here and determine these values
+	instance := &Instance{
+		ID: uuid.New(),
+		SourceImageWidth: 5544,
+		SourceImageHeight: 3744,
+		StepCountX: 6,
+		StepCountY: 6,
+		StepSizeX: 924,
+		StepSizeY: 624,
+	}
+	instance.CompositeImageUrl=fmt.Sprintf("/v1/instance/%v/composite", instance.ID)
 
 	return instance, nil
 }
