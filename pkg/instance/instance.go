@@ -14,7 +14,7 @@ import (
 )
 
 type Instance struct {
-	ID uuid.UUID
+	ID uuid.UUID `json:"id"`
 	CompositeImageUrl string `json:"compositeImageUrl"`
 	SourceImageWidth int64 `json:"sourceImageWidth"`
 	SourceImageHeight int64 `json:"sourceImageHeight"`
@@ -74,7 +74,6 @@ func (i *Instance) StitchSessionImage() error {
 	contributions := make([]string,0)
 
 	for _, f := range tiles {
-		log.Infof("%s", f.Name())
 		if !f.IsDir() {
 			if path.Ext(f.Name()) == ".jpg" {
 				contributions=append(contributions, f.Name())

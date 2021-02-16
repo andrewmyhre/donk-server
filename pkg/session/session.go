@@ -207,3 +207,45 @@ func (s *Session) UpdateBackgroundImage(data []byte) error {
 	}
 	return nil
 }
+
+func Find(sessionID string) (*Session, error) {
+	instancesPath := path.Join("data", "instances")
+
+	instances, err := ioutil.ReadDir(instancesPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to list subfolders for instance")
+	}
+
+	for _, instanceID := range instances {
+		if instanceID.IsDir() {
+			instanceUUID, err := uuid.Parse(instanceID.Name())
+			if err != nil {
+				continue
+			}
+			// TODO: load the instance from disk if available
+			instanceObj := &instance.Instance {
+				ID: instanceUUID,
+			}
+			sessionsPath := path.Join(instancesPath, instanceID.Name(), "sessions")
+			sessions, err := ioutil.ReadDir(sessionsPath)
+			if err != nil {
+				return nil, errors.Wrap(err, "Failed to list subfolders for instance " + instanceID.Name())
+			}
+			for _, s := range sessions {
+				if s.IsDir() {
+					_, err := uuid.Parse(s.Name())
+					if err != nil {
+						continue
+					}
+					session, err := Open(instanceObj, sessionID)
+					if err != nil {
+						return nil, errors.Wrap(err, "Failed to open session " + session.ID.String())
+					}
+					return session, nil
+				}
+			}
+		}
+	}
+
+	return nil, errors.New("Failed to find session " + sessionID)
+}

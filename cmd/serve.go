@@ -57,10 +57,13 @@ var serveCmd = &cobra.Command{
 		r.HandleFunc("/", HomeHandler)
 		r.HandleFunc("/v1/composite", CompositeHandler)
 		r.HandleFunc("/v1/instance/{instanceID}/composite", CompositeHandler)
-		r.HandleFunc("/v1/instance/{instanceID}", GetInstanceInfoHandler)
+		r.HandleFunc("/v1/instance/{instanceID}", InstanceInfoHandler)
 		r.HandleFunc("/v1/session/new/{x:[0-9]+}/{y:[0-9]+}", NewSessionHandler).Methods(http.MethodPost,http.MethodOptions)
+		r.HandleFunc("/v1/session/{sessionID}", SessionInfoHandler)
 		r.HandleFunc("/v1/session/{sessionID}/background", SessionBackgroundImageHandler)
 		r.HandleFunc("/v1/session/{sessionID}/save", SessionSaveImageHandler).Methods(http.MethodPost,http.MethodOptions)
+		r.HandleFunc("/v1/instance/{instanceID}/session/{sessionID}/background", SessionBackgroundImageHandler)
+		r.HandleFunc("/v1/instance/{instanceID}/session/{sessionID}/save", SessionSaveImageHandler).Methods(http.MethodPost,http.MethodOptions)
 		http.Handle("/v1", r)
 
 		srv := &http.Server{
@@ -81,7 +84,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	log.Info("home")
 }
 
-func GetInstanceInfoHandler(w http.ResponseWriter, r *http.Request) {
+func InstanceInfoHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	if r.Method == http.MethodOptions {
 		return
@@ -89,6 +92,28 @@ func GetInstanceInfoHandler(w http.ResponseWriter, r *http.Request) {
 	json, err := json.Marshal(defaultInstance)
 	if err != nil {
 		log.Error(errors.Wrap(err, "Failed to marshall instance data"))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(json)
+}
+
+func SessionInfoHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method == http.MethodOptions {
+		return
+	}
+	vars := mux.Vars(r)
+	session, err := session.Find(vars["sessionID"])
+	if err != nil {
+		log.Error(errors.Wrap(err, "Failed to find session"))
+	}
+
+	json, err := json.Marshal(session)
+	if err != nil {
+		log.Error(errors.Wrap(err, "Failed to marshall session data"))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
