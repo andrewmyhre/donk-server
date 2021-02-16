@@ -19,6 +19,7 @@ import (
 	"github.com/andrewmyhre/donk-server/pkg/instance"
 	"github.com/andrewmyhre/donk-server/pkg/session"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	_ "image/jpeg"
 	"io/ioutil"
@@ -47,6 +48,7 @@ var serveCmd = &cobra.Command{
 
 		r := mux.NewRouter()
 		r.HandleFunc("/", HomeHandler)
+		r.HandleFunc("/v1/composite", CompositeHandler)
 		r.HandleFunc("/v1/session/new/{x:[0-9]+}/{y:[0-9]+}", NewSessionHandler)
 		r.HandleFunc("/v1/session/{sessionID}/background", SessionBackgroundImageHandler)
 		r.HandleFunc("/v1/session/{sessionID}/save", SessionSaveImageHandler).Methods(http.MethodPost)
@@ -68,6 +70,18 @@ var serveCmd = &cobra.Command{
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	log.Info("home")
+}
+
+func CompositeHandler(w http.ResponseWriter, r *http.Request) {
+	image, err := defaultInstance.GetStitchedImage()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Error(errors.Wrap(err, "Couldn't provide instance composite image"))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(image)
 }
 
 func NewSessionHandler(w http.ResponseWriter, r *http.Request) {

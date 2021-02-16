@@ -11,8 +11,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"strconv"
-	"strings"
 )
 
 type Instance struct {
@@ -38,6 +36,15 @@ func (i *Instance) EnsurePath() error {
 	return nil
 }
 
+func (i *Instance) GetStitchedImage() ([]byte, error) {
+	imageDataPath := path.Join("data", "instances", i.ID.String(), "stitch.jpg")
+	imageData, err := ioutil.ReadFile(imageDataPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to read image file")
+	}
+	return imageData, nil
+}
+
 func (i *Instance) StitchSessionImage() error {
 	instanceDataPath := path.Join("data", "instances", i.ID.String())
 	instanceTilesPath := path.Join("data", "instances", i.ID.String(), "tiles")
@@ -60,7 +67,7 @@ func (i *Instance) StitchSessionImage() error {
 
 	reader, err := os.Open("assets/paper4.jpg")
 	if err != nil {
-		return errors.Wrap(err, "Failed to open assets/paper4.job for reading")
+		return errors.Wrap(err, "Failed to open assets/paper4.jpg for reading")
 	}
 	source, _, err := image.Decode(reader)
 	if err != nil {
@@ -70,33 +77,38 @@ func (i *Instance) StitchSessionImage() error {
 	newImageSize := image.Rect(source.Bounds().Min.X,source.Bounds().Min.Y,source.Bounds().Max.X,source.Bounds().Max.Y)
 	stitchedImage := image.NewRGBA(newImageSize)
 
-	for _, c := range contributions {
-		loc := strings.Split(strings.ReplaceAll(c, path.Ext(c), ""), ",")
-		x, err := strconv.Atoi(loc[0])
-		y, err := strconv.Atoi(loc[1])
+	for tY := 0; tY < 6; tY++ {
+		for tX := 0; tX < 6; tX++ {
+			offsetX := tile.XStep * tX
+			offsetY := tile.YStep * tY
+			tileImagePath := path.Join(instanceTilesPath, fmt.Sprintf("%d,%d.jpg", tX, tY))
+			if _, err := os.Stat(tileImagePath); err == nil {
+				contrReader, err := os.Open(tileImagePath)
+				if err != nil {
+					log.Warn(errors.Wrap(err, "failed to open contribution"))
+					continue
+				}
 
-		contrReader, err := os.Open(path.Join(instanceTilesPath, c))
-		if err != nil {
-			log.Warn(errors.Wrap(err, "failed to open contribution"))
-			continue
-		}
+				contrImage, _, err := image.Decode(contrReader)
+				if err != nil {
+					log.Warn(errors.Wrap(err, "failed to decode contribution"))
+					continue
+				}
 
-		contrImage, _, err := image.Decode(contrReader)
-		if err != nil {
-			log.Warn(errors.Wrap(err, "failed to decode contribution"))
-			continue
-		}
-
-		offsetX := tile.XStep * x
-		offsetY := tile.YStep * y
-
-		bounds := contrImage.Bounds()
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			for x := bounds.Min.X; x < bounds.Max.X; x++ {
-				stitchedImage.Set(offsetX+x,offsetY+y,contrImage.At(x,y))
+				bounds := contrImage.Bounds()
+				for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+					for x := bounds.Min.X; x < bounds.Max.X; x++ {
+						stitchedImage.Set(offsetX+x,offsetY+y,contrImage.At(x,y))
+					}
+				}
+			} else {
+				for y := 0; y < tile.YStep; y++ {
+					for x := 0; x < tile.XStep; x++ {
+						stitchedImage.Set(offsetX+x, offsetY+y, source.At(offsetX+x, offsetY+y))
+					}
+				}
 			}
 		}
-
 	}
 
 	stitchedImageFilename := path.Join(instanceDataPath,"stitch.jpg")
