@@ -3,6 +3,7 @@ package session
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/andrewmyhre/donk-server/pkg/instance"
 	"github.com/andrewmyhre/donk-server/pkg/tile"
 	"github.com/google/uuid"
@@ -124,7 +125,11 @@ func Open(instance *instance.Instance, sessionID string) (*Session, error) {
 
 func (s *Session) initializeBackgroundImage() error {
 	sessionPath := path.Join("data", "instances", s.Instance.ID.String(), "sessions",s.ID.String())
-	if stat, err := os.Stat(sessionPath); err != nil || !stat.IsDir() {
+	backgroundImagePath := path.Join(sessionPath,"background.jpg")
+	tileFilename := fmt.Sprintf("%d,%d.jpg", s.Location.X, s.Location.Y)
+	tileImage := path.Join("data", "instances", s.Instance.ID.String(), "tiles", tileFilename)
+
+	if _, err := os.Stat(sessionPath); err != nil && os.IsNotExist(err) {
 		err := os.MkdirAll(sessionPath, 0755)
 		if err != nil {
 			return errors.Wrap(err, "Failed to create session folder")
@@ -132,28 +137,43 @@ func (s *Session) initializeBackgroundImage() error {
 		log.Infof("Created path for session %v", s.ID)
 	}
 
-	reader, err := os.Open("assets/paper4.jpg")
+	if _, err := os.Stat(tileImage); err == nil {
+		log.Infof("Using existing tile image for %d,%d", s.Location.X, s.Location.Y)
+		input, err := ioutil.ReadFile(tileImage)
+        if err != nil {
+                return errors.Wrap(err, "Failed to read tile image")
+        }
+
+        err = ioutil.WriteFile(backgroundImagePath, input, 0644)
+        if err != nil {
+                return errors.Wrap(err, "Failed to write tile to background image")
+        }
+		return nil
+	}
+	log.Info("No existing tile, generating a background from source")
+	
+	reader, err := os.Open(s.Instance.SourceImagePath)
 	if err != nil {
-	    return errors.Wrap(err, "Failed to open assets/paper4.job for reading")
+	    return errors.Wrapf(err, "Failed to open %s for reading", s.Instance.SourceImagePath)
 	}
 	source, _, err := image.Decode(reader)
 	if err != nil {
 		return errors.Wrap(err, "Failed to decode source image")
 	}
 
-	newImageSize := image.Rect(0,0,tile.XStep,tile.YStep)
+	newImageSize := image.Rect(0,0,s.Instance.StepSizeX,s.Instance.StepSizeY)
 	newImage := image.NewRGBA(newImageSize)
 
-	sourceX0 := s.Location.X * tile.XStep
-	sourceY0 := s.Location.Y * tile.YStep
+	sourceX0 := s.Location.X * s.Instance.StepSizeX
+	sourceY0 := s.Location.Y * s.Instance.StepSizeY
 
-	for y := 0; y < tile.YStep; y++ {
-		for x := 0; x < tile.XStep; x++ {
+	for y := 0; y < s.Instance.StepSizeY; y++ {
+		for x := 0; x < s.Instance.StepSizeX; x++ {
 			newImage.Set(x,y,source.At(sourceX0+x,sourceY0+y))
 		}
 	}
 
-	writer, err := os.Create(path.Join(sessionPath,"background.jpg"))
+	writer, err := os.Create(backgroundImagePath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to open background image for writing")
 	}
@@ -227,6 +247,9 @@ func Find(sessionID string) (*Session, error) {
 				ID: instanceUUID,
 			}
 			sessionsPath := path.Join(instancesPath, instanceID.Name(), "sessions")
+			if _, err := os.Stat(sessionsPath); err != nil {
+				continue
+			}
 			sessions, err := ioutil.ReadDir(sessionsPath)
 			if err != nil {
 				return nil, errors.Wrap(err, "Failed to list subfolders for instance " + instanceID.Name())

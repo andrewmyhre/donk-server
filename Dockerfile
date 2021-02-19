@@ -15,4 +15,5 @@ FROM scratch
 
 WORKDIR /
 COPY --from=builder /workspace/bin/donk-server .
+COPY --from=builder /workspace/assets /assets
 ENTRYPOINT ["/donk-server"]
